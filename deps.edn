@@ -5,4 +5,7 @@
  {:test {:extra-paths ["test" "examples"]
          :main-opts ["-m" "siftell.test-runner"]}
   :examples {:extra-paths ["examples"]
-             :main-opts ["-m" "siftell.examples"]}}}
+             :main-opts ["-m" "siftell.examples"]}
+  :build {:extra-paths ["."]
+          :extra-deps {io.github.clojure/tools.build {:mvn/version "0.10.14"}}
+          :ns-default build}}}

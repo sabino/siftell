@@ -1,0 +1,3 @@
+{:lib siftell/siftell
+ :version "0.1.0-SNAPSHOT"
+ :description "Typed conditions and deterministic content composition for Clojure."}
