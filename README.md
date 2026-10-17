@@ -1,5 +1,7 @@
 # Siftell
 
+[![Check](https://github.com/sabino/siftell/actions/workflows/check.yml/badge.svg)](https://github.com/sabino/siftell/actions/workflows/check.yml)
+
 **Conditions sift the content. Templates tell the result.**
 
 Siftell is a Clojure library for selecting and composing content from typed
@@ -20,11 +22,22 @@ clojure -Srepro -M:examples
 clojure -Srepro -M:test
 ```
 
-For a local dependency:
+Add Siftell to `deps.edn`:
 
 ```clojure
-{:deps {siftell/siftell {:local/root "../siftell"}}}
+{:deps {io.github.sabino/siftell {:mvn/version "0.1.0"}}}
 ```
+
+With Leiningen:
+
+```clojure
+[io.github.sabino/siftell "0.1.0"]
+```
+
+For local development, use `{:local/root "../siftell"}` in place of the
+version map. Maven coordinates are `io.github.sabino:siftell:0.1.0`.
+[Release artifacts](https://github.com/sabino/siftell/releases) include the
+library, source and documentation JARs.
 
 The runtime dependencies are Clojure and Malli.
 
@@ -136,4 +149,4 @@ The build creates a thin source JAR with generated Maven metadata and
 LICENSE. Verification loads that JAR from a temporary consumer and
 checks rendering using its declared dependencies.
 
-[Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [MIT license](LICENSE)
+[Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Publishing](doc/publishing.md) · [MIT license](LICENSE)

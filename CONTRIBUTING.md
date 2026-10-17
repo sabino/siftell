@@ -7,7 +7,8 @@ Use Java 21 or newer and the Clojure CLI.
 ```sh
 clojure -Srepro -M:test
 clojure -Srepro -M:examples
-clojure -Srepro -T:build jar
+python3 -m unittest discover -s scripts -p 'test_*.py'
+clojure -Srepro -T:build release
 python3 scripts/check-package.py
 ```
 
@@ -36,3 +37,5 @@ development tooling remain outside the runtime artifact.
 Explain the problem, resulting behavior and checks run. Include an exact
 before/after example when a semantic change is involved. Update
 [CHANGELOG.md](CHANGELOG.md) for user-visible changes.
+
+See [Publishing](doc/publishing.md) for versioned release preparation.

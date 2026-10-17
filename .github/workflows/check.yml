@@ -1,5 +1,8 @@
 name: Check
-on: [push, pull_request]
+on:
+  push:
+    branches: ['**']
+  pull_request:
 permissions:
   contents: read
 jobs:
@@ -14,7 +17,9 @@ jobs:
       - uses: DeLaGuardo/setup-clojure@3fe9b3ae632c6758d0b7757b0838606ef4287b08
         with:
           cli: 1.12.6.1673
-      - run: clojure -M:test
-      - run: clojure -M:examples
-      - run: clojure -T:build jar
+      - run: clojure -Srepro -M:test
+      - run: clojure -Srepro -M:examples
+      - run: clojure -Srepro -T:build release
       - run: python3 scripts/check-package.py
+      - run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - run: python3 scripts/central-release.py bundle --unsigned

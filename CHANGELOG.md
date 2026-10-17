@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0-SNAPSHOT
+## 0.1.0 — 2026-10-17
 
 ### Added
 
@@ -11,3 +11,5 @@
 - Nested collection quantifiers and deterministic text templates.
 - Structured diagnostics, strict template error mode and definition identity.
 - Bounded EDN reading, six executable examples and thin JAR verification.
+
+- Maven Central release artifacts, signed publishing workflow and downloadable source/API documentation.

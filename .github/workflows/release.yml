@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag, such as v0.1.0'
+        required: true
+        type: string
+      deployment_id:
+        description: 'Resume a Central deployment without uploading again'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'sabino/siftell'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify release tag
+        run: |
+          python3 - <<'PY'
+          import os, re, subprocess
+          tag = os.environ['RELEASE_TAG']
+          if not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?', tag):
+              raise SystemExit('Choose a semantic version tag, such as v0.1.0')
+          head = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          tagged = subprocess.check_output(['git', 'rev-parse', 'refs/tags/' + tag + '^{commit}'], text=True).strip()
+          if head != tagged:
+              raise SystemExit('The checkout must match the release tag')
+          PY
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: DeLaGuardo/setup-clojure@3fe9b3ae632c6758d0b7757b0838606ef4287b08
+        with:
+          cli: 1.12.6.1673
+      - name: Check library and examples
+        run: |
+          clojure -Srepro -M:test
+          clojure -Srepro -M:examples
+          python3 -m unittest discover -s scripts -p 'test_*.py'
+      - name: Build and verify release artifacts
+        run: |
+          clojure -Srepro -T:build release
+          python3 scripts/check-package.py
+      - name: Sign and assemble Central bundle
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: python3 scripts/central-release.py bundle --tag "$RELEASE_TAG"
+      - name: Publish to Maven Central
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+        run: |
+          arguments=(--tag "$RELEASE_TAG")
+          if [ -n "$DEPLOYMENT_ID" ]; then
+            arguments+=(--deployment-id "$DEPLOYMENT_ID")
+          fi
+          python3 scripts/central-release.py publish "${arguments[@]}"
+      - name: Preserve release artifacts and deployment receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: siftell-${{ env.RELEASE_TAG }}
+          if-no-files-found: ignore
+          path: |
+            target/siftell-*.jar
+            target/siftell-*.pom
+            target/central-bundle.zip
+            target/central-bundle.json
+            target/central-deployment.json
+            target/signatures/*.asc
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "GitHub release already exists; keeping its existing assets."
+          else
+            gh release create "$RELEASE_TAG" \
+              --verify-tag --title "Siftell $RELEASE_TAG" --generate-notes \
+              target/siftell-*.jar target/siftell-*.pom \
+              target/central-bundle.zip target/signatures/*.asc
+          fi

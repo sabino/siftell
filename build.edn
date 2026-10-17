@@ -1,3 +1,13 @@
-{:lib siftell/siftell
- :version "0.1.0-SNAPSHOT"
- :description "Typed conditions and deterministic content composition for Clojure."}
+{:lib io.github.sabino/siftell
+ :version "0.1.0"
+ :name "Siftell"
+ :description "Typed conditions and deterministic content composition for Clojure."
+ :url "https://github.com/sabino/siftell"
+ :scm {:url "https://github.com/sabino/siftell"
+       :connection "scm:git:https://github.com/sabino/siftell.git"
+       :developer-connection "scm:git:ssh://git@github.com/sabino/siftell.git"
+       :tag "v0.1.0"}
+ :developers [{:id "sabino"
+               :name "Felipe Guilherme Sabino"
+               :email "982190+sabino@users.noreply.github.com"
+               :url "https://github.com/sabino"}]}
