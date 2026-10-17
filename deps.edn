@@ -1,0 +1,5 @@
+{:paths ["src"]
+ :deps {org.clojure/clojure {:mvn/version "1.12.5"}
+        metosin/malli {:mvn/version "0.20.1" :exclusions [org.clojure/test.check]}}
+ :aliases {:test {:extra-paths ["test"]
+                  :main-opts ["-m" "siftell.test-runner"]}}}
