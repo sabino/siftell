@@ -188,6 +188,20 @@ def verify_bundle(path, tag):
         return {"group": group, "artifact": artifact, "version": version, "tag": tag}
 
 
+def verify_publication(result, metadata, deployment_id):
+    """Bind a published deployment to this exact artifact, version and request."""
+    expected = "pkg:maven/{group}/{artifact}@{version}".format(**metadata)
+    purls = result.get("purls")
+    try:
+        same_deployment = uuid.UUID(result.get("deploymentId", "")) == uuid.UUID(deployment_id)
+    except (ValueError, TypeError, AttributeError):
+        same_deployment = False
+    if (result.get("deploymentState") != "PUBLISHED" or not same_deployment
+            or not isinstance(purls, list) or not all(isinstance(item, str) for item in purls)
+            or expected not in purls):
+        raise ReleaseError("Published deployment does not identify this artifact and version")
+
+
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, request, file_pointer, code, message, headers, new_url):
         return None
@@ -302,6 +316,7 @@ def main(arguments=None):
             receipt.write_text(json.dumps(dict(metadata, deployment_id=deployment), indent=2) + "\n")
             print("Deployment:", deployment, flush=True)
             result = publisher.wait(deployment, options.timeout)
+            verify_publication(result, metadata, deployment)
             receipt.write_text(json.dumps(dict(metadata, deployment_id=deployment, state=result["deploymentState"]), indent=2) + "\n")
             print("Published", metadata["group"] + ":" + metadata["artifact"] + ":" + metadata["version"])
     except (ReleaseError, OSError, ET.ParseError, subprocess.TimeoutExpired) as error:

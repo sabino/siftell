@@ -28,6 +28,7 @@ VERSION = "1.2.3"
 TAG = "v1.2.3"
 PREFIX = "io/github/sabino/siftell/1.2.3/"
 DEPLOYMENT = "7f05d966-a40b-4dfa-9948-70ec01caebf6"
+PURL = "pkg:maven/io.github.sabino/siftell@1.2.3"
 SIGNATURE = b"-----BEGIN PGP SIGNATURE-----\nfixture-only\n-----END PGP SIGNATURE-----\n"
 USERNAME = "test-release-account"
 PASSWORD = "test-release-password"
@@ -386,6 +387,52 @@ class PublisherTests(unittest.TestCase):
         self.assertEqual(len(opener.requests), 1)
 
 
+class PublicationIdentityTests(unittest.TestCase):
+    def setUp(self):
+        self.metadata = {"group": GROUP, "artifact": ARTIFACT,
+                         "version": VERSION, "tag": TAG}
+        self.result = {"deploymentState": "PUBLISHED", "deploymentId": DEPLOYMENT,
+                       "purls": [PURL]}
+
+    def test_published_expected_coordinates_and_deployment_are_accepted(self):
+        release.verify_publication(self.result, self.metadata, DEPLOYMENT)
+
+    def test_wrong_project_group_or_version_cannot_prove_publication(self):
+        for purl in ("pkg:maven/org.example/unrelated@1.2.3",
+                     "pkg:maven/io.github.sabino/another-library@1.2.3",
+                     "pkg:maven/io.github.sabino/siftell@1.2.4",
+                     "pkg:maven/io.github.other/siftell@1.2.3",
+                     PURL + "-SNAPSHOT", PURL + "?classifier=sources"):
+            result = dict(self.result, purls=[purl])
+            with self.subTest(purl=purl), self.assertRaises(release.ReleaseError):
+                release.verify_publication(result, self.metadata, DEPLOYMENT)
+
+    def test_missing_empty_or_malformed_package_url_collection_is_rejected(self):
+        results = [{key: value for key, value in self.result.items() if key != "purls"}]
+        results += [dict(self.result, purls=value)
+                    for value in (None, [], PURL, {"purl": PURL}, 12,
+                                  [None], [12], [PURL, None], [PURL, {"other": "value"}])]
+        for result in results:
+            with self.subTest(purls=result.get("purls", "absent")), self.assertRaises(release.ReleaseError):
+                release.verify_publication(result, self.metadata, DEPLOYMENT)
+
+    def test_different_missing_or_malformed_deployment_id_is_rejected(self):
+        results = [{key: value for key, value in self.result.items() if key != "deploymentId"}]
+        results += [dict(self.result, deploymentId=value)
+                    for value in (None, "not-a-uuid", 12, [], {},
+                                  "7f05d966-a40b-4dfa-9948-70ec01caebf7")]
+        for result in results:
+            with self.subTest(deployment_id=result.get("deploymentId", "absent")), \
+                 self.assertRaises(release.ReleaseError):
+                release.verify_publication(result, self.metadata, DEPLOYMENT)
+
+    def test_only_published_state_proves_publication(self):
+        for state in (None, "PENDING", "VALIDATING", "VALIDATED", "PUBLISHING", "FAILED", "unknown"):
+            with self.subTest(state=state), self.assertRaises(release.ReleaseError):
+                release.verify_publication(dict(self.result, deploymentState=state),
+                                           self.metadata, DEPLOYMENT)
+
+
 class ResumeTests(ReleaseFixture):
     @contextmanager
     def working_directory(self):
@@ -403,7 +450,8 @@ class ResumeTests(ReleaseFixture):
         receipt_path.write_text(json.dumps({"group": GROUP, "artifact": ARTIFACT,
                                             "version": VERSION, "tag": TAG,
                                             "deployment_id": DEPLOYMENT}))
-        opener = FakeOpener({"deploymentState": "PUBLISHED", "deploymentId": DEPLOYMENT})
+        opener = FakeOpener({"deploymentState": "PUBLISHED", "deploymentId": DEPLOYMENT,
+                             "purls": [PURL]})
         publisher = release.Publisher(USERNAME, PASSWORD, opener=opener)
         with self.working_directory(), patch.object(release, "Publisher", return_value=publisher), \
              redirect_stdout(io.StringIO()):
@@ -415,12 +463,32 @@ class ResumeTests(ReleaseFixture):
 
     def test_explicit_deployment_id_never_uploads(self):
         self.signed_bundle()
-        opener = FakeOpener({"deploymentState": "PUBLISHED"})
+        opener = FakeOpener({"deploymentState": "PUBLISHED", "deploymentId": DEPLOYMENT,
+                             "purls": [PURL]})
         publisher = release.Publisher(USERNAME, PASSWORD, opener=opener)
         with self.working_directory(), patch.object(release, "Publisher", return_value=publisher), \
              redirect_stdout(io.StringIO()):
             release.main(["publish", "--bundle", str(self.bundle_path), "--tag", TAG,
                           "--deployment-id", DEPLOYMENT])
+        self.assertEqual(len(opener.requests), 1)
+        self.assertIn("/status?id=" + DEPLOYMENT, opener.requests[0][0].full_url)
+
+    def test_resuming_unrelated_deployment_cannot_mark_current_release_published(self):
+        self.signed_bundle()
+        opener = FakeOpener({"deploymentState": "PUBLISHED", "deploymentId": DEPLOYMENT,
+                             "purls": ["pkg:maven/org.example/unrelated@9.9.9"]})
+        publisher = release.Publisher(USERNAME, PASSWORD, opener=opener)
+        output = io.StringIO()
+        with self.working_directory(), patch.object(release, "Publisher", return_value=publisher), \
+             redirect_stdout(output), redirect_stderr(io.StringIO()), \
+             self.assertRaises(SystemExit) as failure:
+            release.main(["publish", "--bundle", str(self.bundle_path), "--tag", TAG,
+                          "--deployment-id", DEPLOYMENT])
+        self.assertNotEqual(failure.exception.code, 0)
+        self.assertNotIn("Published " + GROUP + ":" + ARTIFACT, output.getvalue())
+        receipt = json.loads((self.root / "target" / "central-deployment.json").read_text())
+        self.assertNotEqual(receipt.get("state"), "PUBLISHED")
+        self.assertEqual(receipt["deployment_id"], DEPLOYMENT)
         self.assertEqual(len(opener.requests), 1)
         self.assertIn("/status?id=" + DEPLOYMENT, opener.requests[0][0].full_url)
 
