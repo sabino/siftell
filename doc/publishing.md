@@ -1,8 +1,13 @@
 # Publishing Siftell
 
 Siftell uses Maven Central coordinates `io.github.sabino:siftell`. The release
-build produces a source-only library JAR, its sources JAR, a documentation JAR
-containing the actual Clojure guide and API reference, and a complete POM.
+build produces the source-only library JAR, sources JAR, documentation JAR and
+POM. The documentation JAR contains the Clojure guide, API reference and examples.
+
+Babashka handles local checks and artifact preparation. The official
+[JReleaser GitHub Action](https://github.com/jreleaser/release-action) handles
+signing, Central deployment and the GitHub release. Its configuration is
+[jreleaser.yml](../jreleaser.yml); the workflow pins JReleaser 1.26.0.
 
 ## Account and signing configuration
 
@@ -20,17 +25,17 @@ Configure these repository Actions secrets:
 | `GPG_PRIVATE_KEY` | Armored export of the dedicated release signing key |
 | `GPG_PASSPHRASE` | Its passphrase |
 
-The public release key is [signing-key.asc](../signing-key.asc), fingerprint
-`ED32C23E4F4B0A7D985C1B9FC9B90D37EEFF34B7`. Its public key
-must be available through a supported keyserver, such as
-`hkps://keyserver.ubuntu.com`, before Central validates the signatures.
-The signing script imports its key into a temporary keyring and removes that
-keyring after use. Secret key material is never included in release artifacts.
+The workflow maps those secrets to JReleaser's environment variables. It reads
+the public key from [signing-key.asc](../signing-key.asc), fingerprint
+`ED32C23E4F4B0A7D985C1B9FC9B90D37EEFF34B7`.
+[JReleaser signing](https://jreleaser.org/guide/latest/reference/signing.html)
+uses `MEMORY` mode and verifies the generated signatures.
 
-For key rotation, generate a new dedicated signing key, export it with
-`gpg --armor --export-secret-keys FINGERPRINT`, update the two signing secrets,
-replace the public key file, and publish that public key to the keyserver.
-Never commit the secret key or passphrase.
+The public key must be available through a supported keyserver, such as
+`hkps://keyserver.ubuntu.com`, before Central validates the signatures.
+For rotation, replace the dedicated signing key and passphrase secrets,
+update the tracked public key and its documented fingerprint, and publish the
+new public key to the keyserver. Never commit private key material or a passphrase.
 
 ## Prepare a release
 
@@ -39,16 +44,13 @@ Never commit the secret key or passphrase.
 2. Run the local checks:
 
    ```sh
-   clojure -Srepro -M:test
-   clojure -Srepro -M:examples
-   python3 -m unittest discover -s scripts -p 'test_*.py'
-   clojure -Srepro -T:build release
-   python3 scripts/check-package.py
-   python3 scripts/central-release.py bundle --unsigned
+   bb check
+   bb version
    ```
 
-   Unsigned bundling checks layout and checksums without credentials. The
-   publisher rejects unsigned bundles.
+   `bb check` runs tests, examples, the release build and isolated package
+   verification. The four release artifacts are staged in Maven repository
+   layout under `target/central`.
 
 3. Commit the release preparation, then create and push its version tag:
 
@@ -58,38 +60,45 @@ Never commit the secret key or passphrase.
    git push origin vVERSION
    ```
 
-The Release workflow checks that its checkout matches the tag, reruns the
-tests, builds and checks all artifacts, signs them, and uploads the signed
-bundle through the Central Publisher API. It waits for `PUBLISHED` before
-creating a GitHub release with downloadable artifacts. A validated deployment
-alone is not treated as published.
+The Release workflow runs `bb ci-release` to verify that HEAD matches the tag
+and that the tag matches `build.edn`. That task exports the canonical project
+version and tracked public key to the workflow. After `bb check`, publishing
+runs in three steps:
+
+1. JReleaser's `deploy --strict` signs the artifacts, checks Maven metadata and
+   deploys the staged release to Central.
+2. `bb verify-central` waits for the published library JAR, sources JAR,
+   documentation JAR and POM to become available, then compares all four files
+   byte for byte with the local release artifacts. Missing or different bytes
+   fail verification and prevent the GitHub release.
+3. JReleaser's `full-release --strict --exclude-deployer-name sonatype` signs
+   the downloadable assets and creates the GitHub release after verification.
+
+The GitHub release contains the three JARs, POM, checksums and signatures.
+Existing version tags are preserved; releases are not overwritten. No issue
+comments or release announcements are configured. See the maintained
+[JReleaser workflow reference](https://jreleaser.org/guide/latest/concepts/workflow.html)
+for its release stages.
 
 Central release versions are immutable. Publish a new version for changes.
-The library's runtime dependencies are Clojure and Malli. Malli is resolved
-through Clojars, which the generated POM declares; Clojure CLI also includes
-Clojars in its default repositories.
+The runtime dependencies are Clojure and Malli. Malli is resolved through
+Clojars, which Clojure CLI and Leiningen include by default. Maven and Gradle
+consumers must add `https://repo.clojars.org/` to their repositories. The
+published POM leaves repository selection to the consuming build.
 
-## Inspect or resume a deployment
+## Inspect a deployment
 
-The workflow preserves the bundle, checksums, public signatures and
-`central-deployment.json` as a GitHub Actions artifact, including when a
-deployment fails or exceeds the polling deadline.
+The workflow preserves release artifacts, JReleaser logs and
+`out/jreleaser/output.properties` as a GitHub Actions artifact, including when a
+deployment fails or exceeds its polling deadline. The properties file records
+the Central deployment identifier for inspection in Central Portal.
 
-For a pending deployment, run Release manually with the original tag and the
-existing deployment ID. It polls that deployment without uploading again.
-Locally, the publisher also reuses a matching saved deployment receipt.
+The Release workflow can also be started manually with an existing `tag`.
+Manual runs execute the same checks and deployment sequence. Inspect the status
+of an earlier deployment before starting another run. For failed validation,
+correct Central's reported cause. Once a version has been published, use a new
+version for subsequent changes.
 
-```sh
-python3 scripts/central-release.py publish \
-  --tag vVERSION --deployment-id DEPLOYMENT_UUID
-```
-
-Set the two Central credential environment variables before running that
-command. It verifies `target/central-bundle.zip` before contacting Central.
-For a failed validation, inspect Central's errors and correct the cause;
-do not repeatedly upload a deployment whose status is unknown.
-
-The implementation follows the official
-[artifact requirements](https://central.sonatype.org/publish/requirements/),
-[namespace registration](https://central.sonatype.org/register/namespace/),
-and [Publisher API](https://central.sonatype.org/publish/publish-portal-api/).
+See the maintained
+[Maven Central deployer reference](https://jreleaser.org/guide/latest/reference/deploy/maven/maven-central.html)
+for deployment diagnostics and publication checks.

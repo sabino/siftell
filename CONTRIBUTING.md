@@ -1,15 +1,22 @@
 # Contributing
 
-Use Java 21 or newer and the Clojure CLI.
+Use Java 21 or newer, the Clojure CLI and Babashka.
 
 ## Run the checks
 
 ```sh
-clojure -Srepro -M:test
-clojure -Srepro -M:examples
-python3 -m unittest discover -s scripts -p 'test_*.py'
-clojure -Srepro -T:build release
-python3 scripts/check-package.py
+bb check
+```
+
+This runs the tests, executable examples, release build and package verification
+in sequence. Individual tasks are available for focused work:
+
+```sh
+bb test
+bb examples
+bb build
+bb check-package
+bb version
 ```
 
 The examples are executable documentation. A behavior change should update
@@ -29,8 +36,9 @@ Document public options and structured errors. Diagnostics should identify
 the failed declaration or fragment without recording observed input values.
 Examples should use small self-contained data and assert their actual output.
 
-The JAR packages library source and required metadata. Tests, examples and
-development tooling remain outside the runtime artifact.
+The library JAR packages runtime source and required metadata. Tests and build
+tooling remain outside that artifact; the documentation JAR includes the guide,
+API reference and executable examples.
 
 ## Review
 
@@ -38,4 +46,5 @@ Explain the problem, resulting behavior and checks run. Include an exact
 before/after example when a semantic change is involved. Update
 [CHANGELOG.md](CHANGELOG.md) for user-visible changes.
 
+Release tooling uses Babashka tasks and the maintained JReleaser GitHub Action.
 See [Publishing](doc/publishing.md) for versioned release preparation.

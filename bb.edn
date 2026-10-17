@@ -1,0 +1,21 @@
+{:paths ["script"]
+ :tasks
+ {:requires ([siftell.package :as package]
+             [siftell.tasks :as tasks])
+  test {:doc "Run the library test suite."
+        :task (tasks/clojure! "-M:test")}
+  examples {:doc "Run all executable examples."
+            :task (tasks/clojure! "-M:examples")}
+  build {:doc "Build and stage Maven release artifacts."
+         :task (tasks/clojure! "-T:build" "release")}
+  check-package {:doc "Verify artifacts and an isolated packaged-library consumer."
+                 :task (package/check!)}
+  verify-central {:doc "Verify published Maven Central artifacts match this build."
+                  :task (package/verify-central!)}
+  check {:doc "Run tests, examples, release build and package verification."
+         :task (do (run 'test) (run 'examples) (run 'build) (run 'check-package))}
+  version {:override-builtin true
+           :doc "Print the release version from build.edn."
+           :task (println (:version (tasks/project)))}
+  ci-release {:doc "Verify the release tag and configure JReleaser in GitHub Actions."
+              :task (tasks/ci-release!)}}}

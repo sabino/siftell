@@ -41,15 +41,18 @@
     (b/copy-dir {:src-dirs ["src"] :target-dir classes})
     (b/write-pom {:class-dir classes :lib lib :version version :basis basis
                   :src-pom :none :src-dirs ["src"] :pom-data (pom-data project)})
-    ;; tools.build supplies its artifact-name default; replace that single node.
+    ;; Set the display name and keep repository selection in consuming builds.
     (let [pom-file (str classes "/META-INF/maven/" (namespace lib) "/" (name lib) "/pom.xml")
           pom (xml/parse-str (slurp pom-file) :skip-whitespace true)]
       (spit pom-file
             (xml/indent-str
              (update pom :content
                      (fn [nodes]
-                       (mapv #(if (and (map? %) (= "name" (name (:tag %))))
-                                (assoc % :content [(:name project)]) %) nodes))))))
+                       (into []
+                             (comp (remove #(and (map? %) (= "repositories" (name (:tag %)))))
+                                   (map #(if (and (map? %) (= "name" (name (:tag %))))
+                                           (assoc % :content [(:name project)]) %)))
+                             nodes))))))
     (b/copy-file {:src "LICENSE" :target (str classes "/LICENSE")})
     (b/jar {:class-dir classes :jar-file jar-file
             :manifest {"Implementation-Title" (str lib)

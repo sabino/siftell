@@ -15,11 +15,11 @@ your own metadata.
 
 ## Try it
 
-Use Java 21 or newer and the Clojure CLI. From this checkout:
+Use Java 21 or newer and the Clojure CLI. Install Babashka for the checkout tasks:
 
 ```sh
-clojure -Srepro -M:examples
-clojure -Srepro -M:test
+bb examples
+bb test
 ```
 
 Add Siftell to `deps.edn`:
@@ -123,7 +123,7 @@ definitions and schema-invalid inputs throw `ExceptionInfo` with
 
 ## Learn through executable examples
 
-`clojure -Srepro -M:examples` runs and checks all six scenarios:
+`bb examples` runs and checks all six scenarios:
 
 | Example | Demonstrates |
 | --- | --- |
@@ -141,12 +141,16 @@ template syntax and errors.
 ## Build
 
 ```sh
-clojure -Srepro -T:build jar
-python3 scripts/check-package.py
+bb build
+bb check-package
 ```
 
-The build creates a thin source JAR with generated Maven metadata and
-LICENSE. Verification loads that JAR from a temporary consumer and
-checks rendering using its declared dependencies.
+The build creates the thin library JAR, sources JAR, documentation JAR and
+Maven metadata. Package verification loads the library from a temporary
+consumer and checks rendering using its declared dependencies. Run `bb check`
+for tests, executable examples, the release build and package verification.
+
+Publishing uses the maintained JReleaser GitHub Action. See the
+[publishing guide](doc/publishing.md) for signing and release preparation.
 
 [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Publishing](doc/publishing.md) · [MIT license](LICENSE)

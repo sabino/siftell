@@ -1,0 +1,55 @@
+project:
+  name: siftell
+  description: Typed conditions and deterministic content composition.
+  authors:
+    - Felipe Guilherme Sabino
+  license: MIT
+  languages:
+    java:
+      groupId: io.github.sabino
+      artifactId: siftell
+      version: '21'
+
+release:
+  github:
+    owner: sabino
+    name: siftell
+    skipTag: true
+    overwrite: false
+    immutableRelease: true
+    update:
+      enabled: false
+    milestone:
+      close: false
+    issues:
+      enabled: false
+    prerelease:
+      pattern: '.*-.*'
+
+signing:
+  active: ALWAYS
+  pgp:
+    active: ALWAYS
+    mode: MEMORY
+    armored: true
+    verify: true
+
+files:
+  artifacts:
+    - path: 'target/siftell-{{projectVersion}}.jar'
+    - path: 'target/siftell-{{projectVersion}}-sources.jar'
+    - path: 'target/siftell-{{projectVersion}}-javadoc.jar'
+    - path: 'target/siftell-{{projectVersion}}.pom'
+
+deploy:
+  maven:
+    mavenCentral:
+      sonatype:
+        active: RELEASE
+        url: https://central.sonatype.com/api/v1/publisher
+        namespace: io.github.sabino
+        authorization: BASIC
+        applyMavenCentralRules: true
+        skipPublicationCheck: false
+        stagingRepositories:
+          - target/central

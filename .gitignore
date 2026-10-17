@@ -2,7 +2,6 @@
 .clj-kondo/.cache/
 .lsp/
 target/
+out/
 .DS_Store
 *.log
-__pycache__/
-*.py[cod]

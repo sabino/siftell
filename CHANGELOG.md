@@ -11,5 +11,7 @@
 - Nested collection quantifiers and deterministic text templates.
 - Structured diagnostics, strict template error mode and definition identity.
 - Bounded EDN reading, six executable examples and thin JAR verification.
-
-- Maven Central release artifacts, signed publishing workflow and downloadable source/API documentation.
+- Babashka tasks for tests, examples, builds and isolated package verification.
+- Maven Central release artifacts and downloadable source/API documentation.
+- Signed publishing through the maintained JReleaser GitHub Action, with Central
+  publication checks and GitHub release assets.
